@@ -11,6 +11,9 @@ int distanceEarthKm(double lat1d, double lon1d, double lat2d, double lon2d);
 // Cria um nó da lista de adjacência
 Edge *newListEdge(int src, int dest, int weight);
 
+// Encontra vertice pelo id
+AdjList *findVertex(Graph *graph, int id);
+
 // Cria o grafo, com V nós
 Graph *createGraph(int V, bool withIds, int *ids);
 

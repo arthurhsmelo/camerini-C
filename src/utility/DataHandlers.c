@@ -94,7 +94,7 @@ void printGraph(Graph *graph) {
   int v;
   for (v = 0; v < graph->V; ++v) {
     Edge *pCrawl = graph->array[v].head;
-    printf("\n Graph Adjacency List \n%d ", v, v);
+    printf("\n Graph Adjacency List \n%d ", graph->array[v].id);
     while (pCrawl) {
       printf(" - [%d -> %d, %d]", pCrawl->src, pCrawl->dest, pCrawl->weight);
       pCrawl = pCrawl->next;
