@@ -13,6 +13,8 @@ typedef struct Edge Edge;
 struct Edge {
   int src;
   int dest;
+  int originalSrc;
+  int originalDest;
   int weight;
   Edge *next;
 };

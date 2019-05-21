@@ -43,8 +43,6 @@ void partitionEdges(Edge *edges, int neg, Edge **A, Edge **B, int *nva, int *nea
     median = (edges[(neg / 2)].weight + edges[(neg / 2) - 1].weight) / 2;
   }
 
-  printf("\nMedian\n %d", median);
-
   for (i = 0; i < neg; i++) {
     Edge edge = edges[i];
     if (edge.weight <= median) {
@@ -59,26 +57,16 @@ void partitionEdges(Edge *edges, int neg, Edge **A, Edge **B, int *nva, int *nea
       *A = realloc(*A, (*nea + 1) * sizeof(Edge));
     }
   }
-
-  printf("\nA\n");
-  for (i = 0; i < *nea; i++) {
-    Edge edge = (*A)[i];
-    printf("[%d -> %d, %d]", edge.src, edge.dest, edge.weight);
-  }
-
-  printf("\nB\n");
-  for (i = 0; i < *neb; i++) {
-    Edge edge = (*B)[i];
-    printf("[%d -> %d, %d]", edge.src, edge.dest, edge.weight);
-  }
 }
 
-AdjList *DFS(Graph *G, int startingV, int *numberOfVertex) {
+void DFS(Graph *G, int startingV, int *numberOfVertex, AdjList **vertexConnected) {
   int i;
   AdjList *vertex = findVertex(G, startingV);
   // Mark the current node as visited
   vertex->visited = true;
+  (*vertexConnected)[*numberOfVertex] = *vertex;
   *numberOfVertex += 1;
+  *vertexConnected = realloc(*vertexConnected, (*numberOfVertex + 1) * sizeof(AdjList));
 
   // Recur for all the vertices adjacent
   // to this vertex
@@ -86,10 +74,10 @@ AdjList *DFS(Graph *G, int startingV, int *numberOfVertex) {
   while (edge) {
     AdjList *vertexDest = findVertex(G, edge->dest);
     if (!vertexDest->visited)
-      return DFS(G, edge->dest, numberOfVertex);
+      DFS(G, edge->dest, numberOfVertex, vertexConnected);
     edge = edge->next;
   }
-  return vertex;
+  return;
 }
 
 Graph *getConnectedComponents(Edge *B, int *nnc, int neb, int nvb) {
@@ -105,34 +93,86 @@ Graph *getConnectedComponents(Edge *B, int *nnc, int neb, int nvb) {
   // Ordena os ids
   qsort(vertexIds, numberOfVertex, sizeof(int), compareNumbers);
 
-  printf("\nids\n");
-  for (i = 0; i < numberOfVertex; i++) {
-    printf("%d, ", vertexIds[i]);
-  }
-  printf("\n");
-
   Graph *GB = createGraph(nvb, true, vertexIds);
   Graph *F = malloc(sizeof(Graph));
 
   for (i = 0; i < neb; i++) {
     Edge edge = B[i];
-    edge.next = NULL;
     duplicateEdge(GB, edge);
   }
 
-  printf("\nAFTER DUPLICATE\n");
-  printGraph(GB);
   for (i = 0; i < GB->V; i++) {
     if (!GB->array[i].visited) {
       auxNv = 0;
-      AdjList *arrayOfVertex = DFS(GB, GB->array[i].id, &auxNv);
-      F[*nnc] = *createGraph(auxNv, false, vertexIds);
+      AdjList *arrayOfVertex = malloc(sizeof(AdjList));
+      DFS(GB, GB->array[i].id, &auxNv, &arrayOfVertex);
+      F[*nnc] = *createGraph(auxNv, false, NULL);
       F[*nnc].array = arrayOfVertex;
       *nnc += 1;
       F = realloc(F, (*nnc + 1) * sizeof(Graph));
     }
   }
   return F;
+}
+
+bool found(int value, int *array, int size) {
+  int i;
+  bool exists = false;
+  for (i = 0; i < size; i++) {
+    if (array[i] == value)
+      exists = true;
+  }
+  return exists;
+}
+
+Graph *populateNewGraph(Edge *A, int nva, int nea, Edge *B, int nvb, int neb, int nnc, Graph *F) {
+  int index, j,
+      countVertexGraph = 0,
+      *vertexInA = malloc(sizeof(int)),
+      sizeVertexInA = 0,
+      sizeByComponent[nnc];
+
+  int **vertexByComponent = (int **)malloc(nnc * sizeof(int *));
+  for (index = 0; index < nnc; index++)
+    vertexByComponent[index] = malloc(sizeof(int));
+
+  for (index = 0; index < nnc; index++) {
+    sizeByComponent[index] = 0;
+    countVertexGraph++;
+    for (j = 0; j < F[index].V; j++) {
+      addIfNotExists(&vertexByComponent[index], &(sizeByComponent)[index], F[index].array[j].id);
+    }
+  }
+
+  for (index = 0; index < nea; index++) {
+    for (j = 0; j < nnc; j++) {
+      if (!found(A[index].src, vertexByComponent[j], sizeByComponent[j])) {
+        addIfNotExists(&vertexInA, &sizeVertexInA, A[index].src);
+      } else {
+        A[index].src = j - nnc;
+      }
+
+      if (found(A[index].dest, vertexByComponent[j], sizeByComponent[j])) {
+        A[index].dest = j - nnc;
+      }
+    }
+  }
+  countVertexGraph += sizeVertexInA;
+
+  int ids[countVertexGraph];
+  for (index = 0; index < countVertexGraph; index++) {
+    if (index < nnc) {
+      ids[index] = index - nnc;
+    } else {
+      ids[index] = vertexInA[index - nnc];
+    }
+  }
+
+  Graph *newGraph = createGraph(countVertexGraph, true, ids);
+  for (index = 0; index < nea; index++) {
+    duplicateEdge(newGraph, A[index]);
+  }
+  return newGraph;
 }
 
 void MBST(Graph *G, Edge *edges, int neg, Graph *mbst) {
@@ -148,27 +188,23 @@ void MBST(Graph *G, Edge *edges, int neg, Graph *mbst) {
   // F -> Vetor de Componentes conectados em B
   // NG -> Merge de A e F
   Graph *F, *NG;
-  if (neg == 4) {
-    return duplicateEdge(mbst, edges[0]);
+  if (neg == 2) {
+    addEdge(mbst, edges[0].originalSrc, edges[0].originalDest, edges[0].weight, true, true, 0, 0);
+    return;
   } else {
     partitionEdges(edges, neg, &A, &B, &nva, &nea, &nvb, &neb);
     F = getConnectedComponents(B, &nnc, neb, nvb);
     // Se B só tem um componente conectado
     // e este possui todos os vértices de G (is spanning tree)
-    printf("\nConnected Components\n%d", nnc);
     if (nnc == 1 && F[0].V == G->V) {
       MBST(G, B, neb, mbst);
     } else {
       // Cria o novo grafo, com os vértices de A + 1 vértice
       // para cada componente conectado de B
-      NG = createGraph(nva, false, NULL);
-      // Armazena as arestas A no novo grafo
-      for (auxIndex = 0; auxIndex < nea; auxIndex++) {
-        duplicateEdge(NG, A[auxIndex]);
-      }
+      NG = populateNewGraph(A, nva, nea, B, nvb, neb, nnc, F);
       // Armazena as arestas B na MBST
       for (auxIndex = 0; auxIndex < neb; auxIndex++) {
-        duplicateEdge(mbst, B[auxIndex]);
+        addEdge(mbst, B[auxIndex].originalSrc, B[auxIndex].originalDest, B[auxIndex].weight, false, true, 0, 0);
       }
       edges = getEdges(NG, &neg);
       MBST(NG, edges, neg, mbst);
@@ -182,8 +218,15 @@ void startTP2(char *citiesFile) {
 
   // Busca a Minimum Bottleneck Spanning Tree
   Graph *mbst = createGraph(graphTelescopes->V, false, NULL);
-  int numberOfEdges;
+  int numberOfEdges, i, maxWeight = -1;
   Edge *edges = getEdges(graphTelescopes, &numberOfEdges);
   MBST(graphTelescopes, edges, numberOfEdges, mbst);
-  printGraph(mbst);
+  edges = getEdges(mbst, &numberOfEdges);
+
+  for (i = 0; i < numberOfEdges; i++) {
+    if (edges[i].weight > maxWeight)
+      maxWeight = edges[i].weight;
+  }
+
+  printf("%d", maxWeight);
 }

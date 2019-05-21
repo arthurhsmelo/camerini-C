@@ -18,16 +18,24 @@ int distanceEarthKm(double lat1d, double lon1d, double lat2d, double lon2d) {
          asin(sqrt(u * u + cos(lat1r) * cos(lat2r) * v * v));
 }
 
-Edge *newEdge(int src, int dest, int weight) {
+Edge *newEdge(int src, int dest, int weight, bool original, int originalSrc, int originalDest) {
   Edge *edge = (Edge *)malloc(sizeof(Edge));
   edge->src = src;
   edge->dest = dest;
   edge->weight = weight;
   edge->next = NULL;
+
+  if (original) {
+    edge->originalSrc = src;
+    edge->originalDest = dest;
+  } else {
+    edge->originalSrc = originalSrc;
+    edge->originalDest = originalDest;
+  }
   return edge;
 }
 
-Graph *createGraph(int V, bool withIds, int *ids) {
+Graph *createGraph(int V, bool withIds, int ids[]) {
   Graph *graph = (Graph *)malloc(sizeof(Graph));
   graph->V = V;
 
@@ -57,21 +65,30 @@ AdjList *findVertex(Graph *graph, int id) {
   }
 }
 
-void addEdge(Graph *graph, int src, int dest, int weight) {
-  Edge *edge = newEdge(src, dest, weight);
+void addEdge(Graph *graph, int src, int dest, int weight, bool twoWays, bool original, int originalSrc, int originalDest) {
+  Edge *edge;
+  if (original)
+    edge = newEdge(src, dest, weight, original, 0, 0);
+  else
+    edge = newEdge(src, dest, weight, original, originalSrc, originalDest);
   AdjList *vertexSrc = findVertex(graph, src);
   edge->next = vertexSrc->head;
   vertexSrc->head = edge;
 
   // Cria a aresta dest -> src, pois é não direcionado
-  edge = newEdge(dest, src, weight);
-  AdjList *vertexDest = findVertex(graph, dest);
-  edge->next = vertexDest->head;
-  vertexDest->head = edge;
+  if (twoWays) {
+    if (original)
+      edge = newEdge(dest, src, weight, original, 0, 0);
+    else
+      edge = newEdge(dest, src, weight, original, originalSrc, originalDest);
+    AdjList *vertexDest = findVertex(graph, dest);
+    edge->next = vertexDest->head;
+    vertexDest->head = edge;
+  }
 }
 
 void duplicateEdge(Graph *graph, Edge edge) {
-  addEdge(graph, edge.src, edge.dest, edge.weight);
+  addEdge(graph, edge.src, edge.dest, edge.weight, false, false, edge.originalSrc, edge.originalDest);
 }
 
 Edge *getEdges(Graph *graph, int *neg) {
@@ -123,11 +140,10 @@ Graph *getGraphFromFile(char *fileName) {
     for (indexEdge = index + 1; indexEdge < numberOfCities; indexEdge++) {
       addEdge(graphTelescopes, index, indexEdge,
               distanceEarthKm(cities[index][0], cities[index][1],
-                              cities[indexEdge][0], cities[indexEdge][1]));
+                              cities[indexEdge][0], cities[indexEdge][1]),
+              true, true, 0, 0);
     }
   }
-
-  printGraph(graphTelescopes);
 
   fclose(uFile);
   return graphTelescopes;

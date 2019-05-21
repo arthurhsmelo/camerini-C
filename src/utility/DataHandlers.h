@@ -18,7 +18,7 @@ AdjList *findVertex(Graph *graph, int id);
 Graph *createGraph(int V, bool withIds, int *ids);
 
 // Adiciona as arestas src -> dest / dest -> src com o peso weight
-void addEdge(Graph *graph, int src, int dest, int weight);
+void addEdge(Graph *graph, int src, int dest, int weight, bool twoWays, bool original, int originalSrc, int originalDest);
 
 // Adiciona aresta já existente em outro grafo
 void duplicateEdge(Graph *graph, Edge edge);
